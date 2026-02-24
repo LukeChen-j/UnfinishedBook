@@ -1,0 +1,89 @@
+name: Build Pages
+
+on:
+  workflow_dispatch:
+    inputs:
+      DeployToCloudflare:
+        description: 'Deploy to Cloudflare Pages'
+        required: false
+        default: false
+        type: boolean
+      DeployToGitHub:
+        description: 'Deploy to GitHub Pages'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  build-pages:
+    runs-on: self-hosted
+    if: ${{ inputs.DeployToCloudflare || inputs.DeployToGitHub }}
+    permissions:
+      id-token: write
+      pages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Install RenPy
+        uses: PaxlavaGames/renpy-install@v0.3.0
+        with:
+          version: "8.5.1"
+          download_web: "yes"
+
+      - name: Apply debug output disable patch
+        run: git apply patch/disable-debug-output.patch
+
+      - name: Apply project info patch
+        run: git apply patch/add-project-info.patch
+
+      - name: Remove un-licensed fonts
+        run: |
+          git apply patch/rollback-fonts.patch
+          rm UnfinishedBook/game/albbpht.otf
+          rm UnfinishedBook/game/msyh.ttf
+          rm UnfinishedBook/game/fzbmyyt.ttf
+
+      - name: Apply progressive download patch
+        run: git apply patch/add-progressive-download.patch
+
+      - name: Copy web assets
+        run: |
+          cp UnfinishedBook/game/images/main_menu/main.jpg UnfinishedBook/web-presplash.jpg
+          cp UnfinishedBook/game/gui/window_icon.png UnfinishedBook/web-icon.png
+
+      - name: Build RenPy
+        uses: PaxlavaGames/renpy-web-build@v0.2.0
+        with:
+          path: './UnfinishedBook'
+
+      - name: Setup Pages
+        if: ${{ inputs.DeployToGitHub }}
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        if: ${{ inputs.DeployToGitHub }}
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: './web_build'
+
+      - name: Deploy to GitHub Pages
+        if: ${{ inputs.DeployToGitHub }}
+        id: deployment-github
+        uses: actions/deploy-pages@v4
+
+      - name: Set up Node.js
+        if: ${{ inputs.DeployToCloudflare }}
+        uses: actions/setup-node@v6
+        with:
+          node-version: 'latest'
+
+      - name: Deploy to Cloudflare Pages
+        if: ${{ inputs.DeployToCloudflare }}
+        id: deployment-cloudflare
+        uses: cloudflare/wrangler-action@v3
+        with:
+          wranglerVersion: '4.67.0'
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          command: |
+            pages deploy web_build --project-name unfinished-book --branch master
