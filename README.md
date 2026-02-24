@@ -1,3 +1,5 @@
+（从 [UnfinishedBook-reverse](https://github.com/kj415j45/UnfinishedBook-reverse) 偷的）
+
 # 《未竟之书》解包
 
 - [在线游玩！](https://unb.kj415j45.space/) - Powered by [Cloudflare Pages](https://pages.cloudflare.com/)
